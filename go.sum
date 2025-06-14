@@ -20,10 +20,6 @@ github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zt
 github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
 github.com/mattn/go-runewidth v0.0.16 h1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6TULQc=
 github.com/mattn/go-runewidth v0.0.16/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
-github.com/nonhumantrades/mmdb-proto v1.0.0 h1:6rwhm2yRhgZmi0RA7LRdy7iY9gQqJnEAfCDuFBkztIk=
-github.com/nonhumantrades/mmdb-proto v1.0.0/go.mod h1:iQMRqCWGxk6S5QnaYZCwZK8BTPARmnz2c1J56wJyyHk=
-github.com/nonhumantrades/mmdb-proto v1.0.2 h1:alSr7oSKPg8AFr/YNW2O/FMru6FwVlxT0mJDp6q+0hQ=
-github.com/nonhumantrades/mmdb-proto v1.0.2/go.mod h1:iQMRqCWGxk6S5QnaYZCwZK8BTPARmnz2c1J56wJyyHk=
 github.com/nonhumantrades/mmdb-proto v1.0.3 h1:i1ZVFnyll4szOIKWkToJl9zMCySFr/FZpXb+zpwi8mw=
 github.com/nonhumantrades/mmdb-proto v1.0.3/go.mod h1:iQMRqCWGxk6S5QnaYZCwZK8BTPARmnz2c1J56wJyyHk=
 github.com/pierrec/lz4/v4 v4.1.22 h1:cKFw6uJDK+/gfw5BcDL0JL5aBsAFdsIT18eRtLj7VIU=

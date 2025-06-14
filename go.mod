@@ -10,7 +10,6 @@ require (
 	github.com/nonhumantrades/mmdb-proto v1.0.3
 	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/urfave/cli/v2 v2.27.6
-	google.golang.org/protobuf v1.36.6
 	storj.io/drpc v0.0.34
 )
 
@@ -27,4 +26,5 @@ require (
 	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 )

@@ -13,6 +13,7 @@ import (
 
 	"github.com/AR1011/slog"
 	"github.com/nonhumantrades/mmdb-client/client"
+	"github.com/nonhumantrades/mmdb-client/version"
 	"github.com/nonhumantrades/mmdb-proto/proto"
 	"github.com/urfave/cli/v2"
 )
@@ -187,6 +188,14 @@ func main() {
 		Name:  "mmdbcli",
 		Usage: "Manage MMDB tables and S3 backups",
 		Commands: []*cli.Command{
+			{
+				Name:  "version",
+				Usage: "Print the version number",
+				Action: func(c *cli.Context) error {
+					fmt.Printf("mmdbcli %s\n", version.Version)
+					return nil
+				},
+			},
 			{
 				Name:  "config",
 				Usage: "Configure or view settings",
