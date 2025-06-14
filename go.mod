@@ -7,7 +7,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/golang/snappy v1.0.0
 	github.com/klauspost/compress v1.18.0
-	github.com/nonhumantrades/mmdb-proto v1.0.2
+	github.com/nonhumantrades/mmdb-proto v1.0.3
 	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/urfave/cli/v2 v2.27.6
 	google.golang.org/protobuf v1.36.6

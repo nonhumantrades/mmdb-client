@@ -13,7 +13,6 @@ import (
 
 	"github.com/nonhumantrades/mmdb-client/crypto"
 	"github.com/nonhumantrades/mmdb-proto/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"storj.io/drpc"
 	"storj.io/drpc/drpcconn"
 	"storj.io/drpc/drpcmanager"
@@ -424,7 +423,7 @@ func (c *Client) GetTable(ctx context.Context, name string) (*proto.Table, error
 
 func (c *Client) ListTables(ctx context.Context) ([]*proto.Table, error) {
 	return call(c, ctx, func(cli proto.DRPCMMDBClient) ([]*proto.Table, error) {
-		resp, err := cli.ListTables(ctx, &emptypb.Empty{})
+		resp, err := cli.ListTables(ctx, &proto.Empty{})
 		if err != nil {
 			return nil, err
 		}

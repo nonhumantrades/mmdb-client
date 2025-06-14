@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/AR1011/slog"
@@ -68,7 +70,7 @@ func backupAction(inc bool) cli.ActionFunc {
 	return func(c *cli.Context) error {
 		st := loadStore()
 		if st.S3 == nil {
-			return fmt.Errorf("S3 not configured (`mmdbcli config set-s3`)")
+			return fmt.Errorf("S3 not configured (`mmdbcli config set`)")
 		}
 		addr := c.String("server")
 		fullKey := c.String("full-key")
@@ -128,10 +130,62 @@ func restoreAction(c *cli.Context) error {
 	return nil
 }
 
+func humanBytes(b uint64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := uint64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func compressionString(c proto.CompressionMethod) string {
+	s := proto.CompressionMethod_name[int32(c)]
+	return strings.TrimPrefix(s, "Compression")
+}
+
+func listTablesAction(c *cli.Context) error {
+	addr := c.String("server")
+
+	ctx := context.Background()
+	cliConn, err := client.Dial(ctx, client.Config{Address: addr})
+	if err != nil {
+		return err
+	}
+	defer cliConn.Close()
+
+	tables, err := cliConn.ListTables(ctx)
+	if err != nil {
+		return err
+	}
+	if len(tables) == 0 {
+		fmt.Println("No tables found.")
+		return nil
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tROWS\tCOMPRESSED\tUNCOMPRESSED\tCOMPRESSION")
+	for _, t := range tables {
+		fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\n",
+			t.Name,
+			t.RowCount,
+			humanBytes(t.CompressedBytes),
+			humanBytes(t.UncompressedBytes),
+			compressionString(t.Compression),
+		)
+	}
+	_ = w.Flush()
+	return nil
+}
+
 func main() {
 	app := &cli.App{
 		Name:  "mmdbcli",
-		Usage: "Manage MMDB backups in S3",
+		Usage: "Manage MMDB tables and S3 backups",
 		Commands: []*cli.Command{
 			{
 				Name:  "config",
@@ -186,6 +240,14 @@ func main() {
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"},
 					&cli.StringFlag{Name: "key", Usage: "S3 object key to restore from", Required: true},
+				},
+			},
+			{
+				Name:   "tables",
+				Usage:  "List tables in the database",
+				Action: listTablesAction,
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"},
 				},
 			},
 		},
