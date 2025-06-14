@@ -149,6 +149,13 @@ func compressionString(c proto.CompressionMethod) string {
 	return strings.TrimPrefix(s, "Compression")
 }
 
+func safeDiv(a, b uint64) float64 {
+	if b == 0 {
+		return 0
+	}
+	return float64(a) / float64(b)
+}
+
 func listTablesAction(c *cli.Context) error {
 	addr := c.String("server")
 
@@ -169,14 +176,16 @@ func listTablesAction(c *cli.Context) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tROWS\tCOMPRESSED\tUNCOMPRESSED\tCOMPRESSION")
+	fmt.Fprintln(w, "NAME\tROWS\tCOMPRESSED\tUNCOMPRESSED\tCOMPRESSION\tRATIO")
 	for _, t := range tables {
-		fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\n",
+		ratio := safeDiv(t.UncompressedBytes, t.CompressedBytes)
+		fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%0.2fx\n",
 			t.Name,
 			t.RowCount,
 			humanBytes(t.CompressedBytes),
 			humanBytes(t.UncompressedBytes),
 			compressionString(t.Compression),
+			ratio,
 		)
 	}
 	_ = w.Flush()
