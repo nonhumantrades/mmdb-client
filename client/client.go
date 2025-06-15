@@ -264,6 +264,12 @@ func (c *Client) Insert(ctx context.Context, req *proto.InsertRequest) (*proto.I
 	})
 }
 
+func (c *Client) Delete(ctx context.Context, req *proto.DeleteRequest) (*proto.DeleteResponse, error) {
+	return call(c, ctx, func(cli proto.DRPCMMDBClient) (*proto.DeleteResponse, error) {
+		return cli.Delete(ctx, req)
+	})
+}
+
 func (c *Client) Query(ctx context.Context, req *proto.QueryRequest) (*proto.QueryResponse, error) {
 	return call(c, ctx, func(cli proto.DRPCMMDBClient) (*proto.QueryResponse, error) {
 		return cli.Query(ctx, req)
@@ -431,6 +437,12 @@ func (c *Client) ListTables(ctx context.Context) ([]*proto.Table, error) {
 	})
 }
 
+func (c *Client) SyncTable(ctx context.Context, table string) (*proto.SyncTableResponse, error) {
+	return call(c, ctx, func(cli proto.DRPCMMDBClient) (*proto.SyncTableResponse, error) {
+		return cli.SyncTable(ctx, &proto.SyncTableRequest{TableName: table})
+	})
+}
+
 func (c *Client) Backup(ctx context.Context, version uint64, comp proto.CompressionMethod, handler func(*proto.BackupChunk) error) error {
 	stream, err := call(c, ctx, func(cli proto.DRPCMMDBClient) (proto.DRPCMMDB_BackupClient, error) {
 		return cli.Backup(ctx, &proto.BackupRequest{Version: version, Compression: comp})
@@ -453,14 +465,199 @@ func (c *Client) Backup(ctx context.Context, version uint64, comp proto.Compress
 	}
 }
 
-func (c *Client) BackupToS3(ctx context.Context, req *proto.S3BackupRequest) (*proto.S3BackupResponse, error) {
-	return call(c, ctx, func(cli proto.DRPCMMDBClient) (*proto.S3BackupResponse, error) {
-		return cli.BackupToS3(ctx, req)
-	})
+type BackupToS3Params struct {
+	req        *proto.S3BackupRequest
+	onHeader   func(*proto.S3BackupHeader) error
+	onProgress func(*proto.BytesProgress) error
 }
 
-func (c *Client) RestoreFromS3(ctx context.Context, req *proto.RestoreFromS3Request) (*proto.RestoreFromS3Response, error) {
-	return call(c, ctx, func(cli proto.DRPCMMDBClient) (*proto.RestoreFromS3Response, error) {
-		return cli.RestoreFromS3(ctx, req)
-	})
+func NewBackupToS3Params() *BackupToS3Params {
+	return &BackupToS3Params{
+		onHeader:   func(*proto.S3BackupHeader) error { return nil },
+		onProgress: func(*proto.BytesProgress) error { return nil },
+	}
+}
+
+func (p *BackupToS3Params) WithRequest(r *proto.S3BackupRequest) *BackupToS3Params {
+	p.req = r
+	return p
+}
+
+func (p *BackupToS3Params) WithOnHeader(f func(*proto.S3BackupHeader) error) *BackupToS3Params {
+	p.onHeader = f
+	return p
+}
+
+func (p *BackupToS3Params) WithOnProgress(f func(*proto.BytesProgress) error) *BackupToS3Params {
+	p.onProgress = f
+	return p
+}
+
+func (c *Client) BackupToS3(ctx context.Context, p *BackupToS3Params) (*proto.S3BackupFooter, error) {
+	if p == nil || p.req == nil {
+		return nil, errors.New("request is required")
+	}
+
+	var (
+		stream proto.DRPCMMDB_BackupToS3Client
+		conn   *conn
+		ft     *proto.S3BackupFooter
+	)
+
+	var dialErr error
+	for i := 0; i < c.cfg.MaxRetriesPerCall; i++ {
+		w := c.pickConn()
+		cli, err := w.ensureClient(ctx)
+		if err != nil {
+			dialErr = err
+			time.Sleep(c.cfg.ReconnectInterval)
+			continue
+		}
+		stream, err = cli.BackupToS3(ctx, p.req)
+		if err == nil {
+			conn = w
+			break
+		}
+		if isConnectionError(err) {
+			w.markBroken()
+			dialErr = err
+			time.Sleep(c.cfg.ReconnectInterval)
+			continue
+		}
+		return nil, err
+	}
+	if stream == nil {
+		return nil, dialErr
+	}
+
+	for {
+		chunk, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return ft, nil
+			}
+			if isConnectionError(err) {
+				conn.markBroken()
+			}
+			return nil, err
+		}
+
+		switch t := chunk.Chunk.(type) {
+		case *proto.S3BackupChunk_Header:
+			if err = p.onHeader(t.Header); err != nil {
+				return nil, err
+			}
+		case *proto.S3BackupChunk_Progress:
+			if err = p.onProgress(t.Progress); err != nil {
+				return nil, err
+			}
+		case *proto.S3BackupChunk_Footer:
+			ft = t.Footer
+		}
+	}
+}
+
+type RestoreFromS3Params struct {
+	req        *proto.RestoreFromS3Request
+	onHeader   func(*proto.S3RestoreHeader) error
+	onProgress func(*proto.BytesProgress) error
+}
+
+func NewRestoreFromS3Params() *RestoreFromS3Params {
+	return &RestoreFromS3Params{
+		onHeader:   func(*proto.S3RestoreHeader) error { return nil },
+		onProgress: func(*proto.BytesProgress) error { return nil },
+	}
+}
+
+func (p *RestoreFromS3Params) WithRequest(r *proto.RestoreFromS3Request) *RestoreFromS3Params {
+	p.req = r
+	return p
+}
+
+func (p *RestoreFromS3Params) WithOnHeader(f func(*proto.S3RestoreHeader) error) *RestoreFromS3Params {
+	p.onHeader = f
+	return p
+}
+
+func (p *RestoreFromS3Params) WithOnProgress(f func(*proto.BytesProgress) error) *RestoreFromS3Params {
+	p.onProgress = f
+	return p
+}
+
+func (c *Client) RestoreFromS3(ctx context.Context, p *RestoreFromS3Params) (*proto.S3RestoreFooter, error) {
+
+	if p == nil || p.req == nil {
+		return nil, errors.New("request is required")
+	}
+
+	var (
+		stream proto.DRPCMMDB_RestoreFromS3Client
+		conn   *conn
+		ft     *proto.S3RestoreFooter
+	)
+
+	var dialErr error
+	for i := 0; i < c.cfg.MaxRetriesPerCall; i++ {
+		w := c.pickConn()
+		cli, err := w.ensureClient(ctx)
+		if err != nil {
+			dialErr = err
+			time.Sleep(c.cfg.ReconnectInterval)
+			continue
+		}
+		stream, err = cli.RestoreFromS3(ctx, p.req)
+		if err == nil {
+			conn = w
+			break
+		}
+		if isConnectionError(err) {
+			w.markBroken()
+			dialErr = err
+			time.Sleep(c.cfg.ReconnectInterval)
+			continue
+		}
+		return nil, err
+	}
+	if stream == nil {
+		return nil, dialErr
+	}
+
+	for {
+		chunk, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return ft, nil
+			}
+			if isConnectionError(err) {
+				conn.markBroken()
+			}
+			return nil, err
+		}
+
+		switch t := chunk.Chunk.(type) {
+		case *proto.S3RestoreChunk_Header:
+			if err = p.onHeader(t.Header); err != nil {
+				return nil, err
+			}
+		case *proto.S3RestoreChunk_Progress:
+			if err = p.onProgress(t.Progress); err != nil {
+				return nil, err
+			}
+		case *proto.S3RestoreChunk_Footer:
+			ft = t.Footer
+		}
+	}
+}
+
+func Int64(i int64) *int64 {
+	return &i
+}
+
+func Uint32(i uint32) *uint32 {
+	return &i
+}
+
+func Uint64(i uint64) *uint64 {
+	return &i
 }
