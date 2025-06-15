@@ -367,6 +367,11 @@ func listTablesAction(c *cli.Context) error {
 	return nil
 }
 
+func versionAction(c *cli.Context) error {
+	fmt.Printf("mmdbcli %s\n", version.Version)
+	return nil
+}
+
 /* ───────────── main ───────────── */
 
 func main() {
@@ -443,6 +448,11 @@ func main() {
 				Name:   "tables",
 				Action: listTablesAction,
 				Flags:  []cli.Flag{&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"}},
+			},
+			//version
+			{
+				Name:   "version",
+				Action: versionAction,
 			},
 		},
 	}
