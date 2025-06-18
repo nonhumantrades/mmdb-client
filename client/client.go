@@ -279,14 +279,14 @@ func (c *Client) Query(ctx context.Context, req *proto.QueryRequest) (*proto.Que
 type StreamQueryParams struct {
 	req     *proto.QueryRequest
 	onRow   func(*proto.Row) error
-	onBatch func([]*proto.Row) error
+	onBatch func(index uint32, rows []*proto.Row) error
 }
 
 func NewStreamQueryParams() *StreamQueryParams {
 	return &StreamQueryParams{
 		req:     nil,
 		onRow:   func(r *proto.Row) error { return nil },
-		onBatch: func(rows []*proto.Row) error { return nil },
+		onBatch: func(index uint32, rows []*proto.Row) error { return nil },
 	}
 }
 
@@ -295,7 +295,7 @@ func (p *StreamQueryParams) WithOnRow(onRow func(*proto.Row) error) *StreamQuery
 	return p
 }
 
-func (p *StreamQueryParams) WithOnBatch(onBatch func([]*proto.Row) error) *StreamQueryParams {
+func (p *StreamQueryParams) WithOnBatch(onBatch func(index uint32, rows []*proto.Row) error) *StreamQueryParams {
 	p.onBatch = onBatch
 	return p
 }
@@ -403,7 +403,7 @@ func (c *Client) StreamQuery(ctx context.Context, params *StreamQueryParams) (*p
 					return nil, err
 				}
 			}
-			if err := params.onBatch(t.Batch.Rows); err != nil {
+			if err := params.onBatch(t.Batch.Index, t.Batch.Rows); err != nil {
 				return nil, err
 			}
 		case *proto.StreamQueryChunk_Footer:
