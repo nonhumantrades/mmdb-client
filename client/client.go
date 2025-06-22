@@ -272,7 +272,23 @@ func (c *Client) Delete(ctx context.Context, req *proto.DeleteRequest) (*proto.D
 
 func (c *Client) Query(ctx context.Context, req *proto.QueryRequest) (*proto.QueryResponse, error) {
 	return call(c, ctx, func(cli proto.DRPCMMDBClient) (*proto.QueryResponse, error) {
-		return cli.Query(ctx, req)
+		query, err := cli.Query(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		if req.SendCompressed && query.Compression != proto.CompressionMethod_CompressionNone {
+			compHelper, _ := crypto.NewCompressor()
+			decomp := compHelper.Get(int32(query.Compression))
+			for _, r := range query.Rows {
+				r.Data, err = decomp.Decompress(r.Data)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		return query, nil
 	})
 }
 

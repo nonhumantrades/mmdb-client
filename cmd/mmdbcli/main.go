@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/nonhumantrades/mmdb-client/version"
 	"github.com/nonhumantrades/mmdb-proto/proto"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type store struct {
@@ -233,6 +236,8 @@ func restoreAction(c *cli.Context) error {
 		return fmt.Errorf("--key required")
 	}
 
+	tmpfile := c.Bool("tmpfile")
+
 	ctx := context.Background()
 	cliConn, err := client.Dial(ctx, client.Config{Address: addr})
 	if err != nil {
@@ -243,6 +248,7 @@ func restoreAction(c *cli.Context) error {
 	footer, err := runRestore(ctx, cliConn, &proto.RestoreFromS3Request{
 		S3Config:  st.S3,
 		ObjectKey: ensureBackupPrefix(key),
+		TempFile:  tmpfile,
 	})
 	if err != nil {
 		return err
@@ -367,12 +373,105 @@ func listTablesAction(c *cli.Context) error {
 	return nil
 }
 
+func deleteAction(c *cli.Context) error {
+	addr := c.String("server")
+	table := c.String("table")
+	prefix := c.String("prefix")
+	slog.Info("deleteAction", "table", table, "prefix", prefix)
+
+	fromTS, err := parseTimeFlag(c.String("from"), false)
+	if err != nil {
+		return err
+	}
+	toTS, err := parseTimeFlag(c.String("to"), true)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	cliConn, err := client.Dial(ctx, client.Config{Address: addr})
+	if err != nil {
+		return err
+	}
+	defer cliConn.Close()
+
+	resp, err := cliConn.Query(ctx, &proto.QueryRequest{
+		TableName: table,
+		Prefix:    prefix,
+		FilterOptions: &proto.FilterOptions{
+			From: fromTS,
+			To:   toTS,
+		},
+		Head: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Delete %s rows (%s compressed, %s uncompressed) from %q [%s → %s]? [y/N]: ",
+		formatNumber(resp.Count),
+		humanBytes(resp.CompressedBytes),
+		humanBytes(resp.UncompressedBytes),
+		table,
+		tsString(fromTS), tsString(toTS),
+	)
+
+	in, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	if strings.ToLower(strings.TrimSpace(in)) != "y" {
+		fmt.Println("Aborted.")
+		return nil
+	}
+
+	delResp, err := cliConn.Delete(ctx, &proto.DeleteRequest{
+		TableName: table,
+		Prefix:    prefix,
+		FilterOptions: &proto.FilterOptions{
+			From: fromTS,
+			To:   toTS,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Delete completed in %s\n",
+		time.Duration(delResp.Duration).Round(time.Millisecond))
+	return nil
+}
+
+func parseTimeFlag(val string, defaultNow bool) (*timestamppb.Timestamp, error) {
+	if val == "" {
+		if defaultNow {
+			return timestamppb.Now(), nil
+		}
+		return nil, nil // epoch-0
+	}
+	// unix seconds?
+	if sec, err := strconv.ParseInt(val, 10, 64); err == nil {
+		return timestamppb.New(time.Unix(sec, 0)), nil
+	}
+	// "YYYY-MM-DD HH:MM:SS"
+	if t, err := time.ParseInLocation("2006-01-02 15:04:05", val, time.Local); err == nil {
+		return timestamppb.New(t), nil
+	}
+	// RFC3339 fallback
+	if t, err := time.Parse(time.RFC3339, val); err == nil {
+		return timestamppb.New(t), nil
+	}
+	return nil, fmt.Errorf("invalid time %q; use unix seconds or \"YYYY-MM-DD HH:MM:SS\"", val)
+}
+
+func tsString(ts *timestamppb.Timestamp) string {
+	if ts == nil {
+		return "0"
+	}
+	return ts.AsTime().Format(time.RFC3339)
+}
+
 func versionAction(c *cli.Context) error {
 	fmt.Printf("mmdbcli %s\n", version.Version)
 	return nil
 }
-
-/* ───────────── main ───────────── */
 
 func main() {
 	app := &cli.App{
@@ -431,6 +530,7 @@ func main() {
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"},
 					&cli.StringFlag{Name: "key", Required: true},
+					&cli.BoolFlag{Name: "tmpfile", Value: true},
 				},
 			},
 			/* Sync table */
@@ -448,6 +548,19 @@ func main() {
 				Name:   "tables",
 				Action: listTablesAction,
 				Flags:  []cli.Flag{&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"}},
+			},
+			/* Delete rows */
+			{
+				Name:   "delete",
+				Usage:  "Delete rows from a table (requires confirmation)",
+				Action: deleteAction,
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"},
+					&cli.StringFlag{Name: "table", Required: true},
+					&cli.StringFlag{Name: "prefix", Value: ""},
+					&cli.StringFlag{Name: "from", Usage: "start time – unix seconds or \"YYYY-MM-DD HH:MM:SS\""},
+					&cli.StringFlag{Name: "to", Usage: "end time   – unix seconds or \"YYYY-MM-DD HH:MM:SS\""},
+				},
 			},
 			//version
 			{

@@ -28,6 +28,8 @@ github.com/nonhumantrades/mmdb-proto v1.0.6 h1:EOdr/Yx8pot+NHkC87Q6rdbwyh1mIiF+S
 github.com/nonhumantrades/mmdb-proto v1.0.6/go.mod h1:iQMRqCWGxk6S5QnaYZCwZK8BTPARmnz2c1J56wJyyHk=
 github.com/nonhumantrades/mmdb-proto v1.0.7 h1:wd8maR9cghHlSjehNqa3le40K2S0e5vJlIrxmolO4RI=
 github.com/nonhumantrades/mmdb-proto v1.0.7/go.mod h1:iQMRqCWGxk6S5QnaYZCwZK8BTPARmnz2c1J56wJyyHk=
+github.com/nonhumantrades/mmdb-proto v1.0.8 h1:ileZAzkfypvLijO+ToStbG2c6uyGyVbsHdNGbEN84Vs=
+github.com/nonhumantrades/mmdb-proto v1.0.8/go.mod h1:iQMRqCWGxk6S5QnaYZCwZK8BTPARmnz2c1J56wJyyHk=
 github.com/pierrec/lz4/v4 v4.1.22 h1:cKFw6uJDK+/gfw5BcDL0JL5aBsAFdsIT18eRtLj7VIU=
 github.com/pierrec/lz4/v4 v4.1.22/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
 github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=

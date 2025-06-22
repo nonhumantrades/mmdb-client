@@ -8,7 +8,7 @@ require (
 	github.com/golang/snappy v1.0.0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/klauspost/compress v1.18.0
-	github.com/nonhumantrades/mmdb-proto v1.0.7
+	github.com/nonhumantrades/mmdb-proto v1.0.8
 	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/urfave/cli/v2 v2.27.6
 	storj.io/drpc v0.0.34
