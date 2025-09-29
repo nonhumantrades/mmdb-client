@@ -439,6 +439,37 @@ func deleteAction(c *cli.Context) error {
 	return nil
 }
 
+func dropTableAction(c *cli.Context) error {
+	addr := c.String("server")
+	tableName := c.String("table")
+	if tableName == "" {
+		return fmt.Errorf("--table required")
+	}
+
+	fmt.Printf("Drop table %q? This will permanently delete all data. [y/N]: ", tableName)
+
+	in, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	if strings.ToLower(strings.TrimSpace(in)) != "y" {
+		fmt.Println("Aborted.")
+		return nil
+	}
+
+	ctx := context.Background()
+	cliConn, err := client.Dial(ctx, client.Config{Address: addr})
+	if err != nil {
+		return err
+	}
+	defer cliConn.Close()
+
+	err = cliConn.DropTable(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Table %q dropped successfully.\n", tableName)
+	return nil
+}
+
 func parseTimeFlag(val string, defaultNow bool) (*timestamppb.Timestamp, error) {
 	if val == "" {
 		if defaultNow {
@@ -560,6 +591,16 @@ func main() {
 					&cli.StringFlag{Name: "prefix", Value: ""},
 					&cli.StringFlag{Name: "from", Usage: "start time – unix seconds or \"YYYY-MM-DD HH:MM:SS\""},
 					&cli.StringFlag{Name: "to", Usage: "end time   – unix seconds or \"YYYY-MM-DD HH:MM:SS\""},
+				},
+			},
+			/* Drop table */
+			{
+				Name:   "drop",
+				Usage:  "Drop a table (requires confirmation)",
+				Action: dropTableAction,
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "server", Value: "127.0.0.1:7777"},
+					&cli.StringFlag{Name: "table", Required: true},
 				},
 			},
 			//version
